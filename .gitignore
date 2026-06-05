@@ -1,0 +1,24 @@
+# Basic
+.DS_Store
+Thumbs.db
+*.log
+
+# Backend (Golang)
+/api/main
+/api/temp_script_*.js
+/api/*.db
+/api/*.db-journal
+
+# Frontend (Vue 3/Vite)
+/web/node_modules
+/web/dist
+/web/.vscode
+/web/.env*
+
+# Docker
+.docker-compose.db
+.docker-compose.influx
+
+# Environment
+.env
+.env.local
