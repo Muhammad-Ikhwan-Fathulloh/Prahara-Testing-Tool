@@ -16,11 +16,11 @@ services:
       - DOCKER_INFLUXDB_INIT_BUCKET=prahara
       - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=prahara-token
 
-  prahara-api:
-    build: ./api
-    container_name: prahara-api
+  prahara:
+    build: .
+    container_name: prahara-tool
     ports:
-      - "3000:3000"
+      - "80:3000"
     environment:
       - INFLUX_URL=http://influxdb:8086
       - INFLUX_TOKEN=prahara-token
@@ -30,15 +30,8 @@ services:
     depends_on:
       - influxdb
     volumes:
-      - .:/app/data
-
-  prahara-web:
-    build: ./web
-    container_name: prahara-web
-    ports:
-      - "80:80"
-    depends_on:
-      - prahara-api
+      - prahara-db:/root # For the sqlite db
 
 volumes:
   influxdb-data:
+  prahara-db:

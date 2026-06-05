@@ -152,10 +152,18 @@ func main() {
 		c.JSON(http.StatusOK, run)
 	})
 
-	protected.DELETE("/urls/:id", func(c *gin.Context) {
-		id, _ := strconv.Atoi(c.Param("id"))
-		db.Delete(&models.TestingURL{}, id)
-		c.Status(http.StatusNoContent)
+	// Serve static files from Vue dist
+	// In production, this will be in /app/web/dist
+	r.Static("/assets", "./web/dist/assets")
+	r.StaticFile("/favicon.ico", "./web/dist/favicon.ico")
+
+	r.NoRoute(func(c *gin.Context) {
+		// If the request is for /api, don't serve index.html
+		if len(c.Request.URL.Path) >= 4 && c.Request.URL.Path[:4] == "/api" {
+			c.JSON(http.StatusNotFound, gin.H{"error": "API route not found"})
+			return
+		}
+		c.File("./web/dist/index.html")
 	})
 
 	r.Run(":3000")

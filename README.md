@@ -1,116 +1,97 @@
-# ⚡ Prahara
+# Prahara Testing Tool 🚀
 
-**Prahara** (meaning *Storm* or *Tempest* in Indonesian) is a high-performance, lightweight, and secure testing suite designed for modern QA and Load testing. It brings together the power of **k6** and **InfluxDB** with a stunning **Vue 3** dashboard and a robust **Golang** backend.
+[![Docker Publish](https://github.com/Muhammad-Ikhwan-Fathulloh/Prahara-Testing-Tool/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/Muhammad-Ikhwan-Fathulloh/Prahara-Testing-Tool/actions/workflows/docker-publish.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-![Version](https://img.shields.io/badge/version-1.0.0-indigo)
-![License](https://img.shields.io/badge/license-MIT-blue)
-![Stack](https://img.shields.io/badge/stack-Go--Vue--InfluxDB--k6-purple)
+**Prahara** is a lightweight, high-performance, and secure QA and Load Testing tool. It combines the power of **k6** with a modern **Golang** backend and a **Vue 3** dashboard to provide a seamless testing experience.
+
+🔗 **Repository**: [https://github.com/Muhammad-Ikhwan-Fathulloh/Prahara-Testing-Tool](https://github.com/Muhammad-Ikhwan-Fathulloh/Prahara-Testing-Tool)
 
 ---
 
 ## 🌟 Key Features
 
-- [x] **⚡ Quick Storm**: Instant dynamic load testing for any URL directly from the dashboard.
-- [x] **🌐 URL Registry & Categories**: Centralized management for testing endpoints with categories (Frontend, Backend, API, etc.).
-- **🚀 High-Performance Engine**: Backend written in **Golang** (Gin) for maximum efficiency and concurrency.
+- **⚡ Quick Storm**: Instant dynamic load testing for any URL directly from the dashboard.
+- **🌐 URL Registry & Categories**: Centralized management for testing endpoints with categories (Frontend, Backend, API, etc.).
+- **🚀 Unified Architecture**: API and Web bundled into a single high-performance Docker image.
 - **📈 Native k6 Integration**: Seamlessly execute k6 scripts and visualize metrics in real-time.
-- **🕒 Sustainability & History**: All metrics are stored in **InfluxDB**, allowing you to track performance trends over weeks or months.
-- **🔐 Secure RBAC**: Fine-grained access control with Roles (Admin, Tester) powered by JWT and SQLite.
-- **📊 Professional Visualization**: Interactive charts for Latency, Throughput, and Success Rates using **Chart.js**.
-- **🐳 Zero-Conf Dockerized**: Deploy the entire stack (API, Web, DB) with a single command.
-
----
-
-## 🏗️ Architecture
-
-```mermaid
-graph LR
-    User[Client Browser] <--> Web[Vue 3 Frontend]
-    Web <--> API[Golang API]
-    API <--> k6[k6 Engine]
-    k6 -- Metrics --> Influx[InfluxDB]
-    API -- Query --> Influx
-    API <--> SQLite[SQLite RBAC]
-```
-
----
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-- [Docker](https://www.docker.com/get-started)
-- [Docker Compose](https://docs.docker.com/compose/install/)
-
-### Installation
-
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/your-repo/prahara.git
-   cd prahara
-   ```
-
-2. **Launch the stack**:
-   ```bash
-   docker-compose up --build
-   ```
-
-3. **Access the application**:
-   - **Frontend**: `http://localhost`
-   - **API**: `http://localhost:3000`
-   - **InfluxDB Dashboard**: `http://localhost:8086`
-
----
-
-## 🤖 CI/CD Setup (GitHub Actions)
-
-To enable automatic Docker Hub publishing, you need to configure the following **Secrets** in your GitHub repository (`Settings > Secrets and variables > Actions`):
-
-1. **`DOCKERHUB_USERNAME`**: Your Docker Hub username.
-2. **`DOCKERHUB_TOKEN`**: Your Docker Hub Personal Access Token (PAT).
-
-The workflow will trigger on every push to the `main` branch, building and pushing:
-- `yourusername/prahara-api:latest`
-- `yourusername/prahara-web:latest`
-
----
-
-## 📖 Usage Guide
-
-### 1. Authentication
-- **Default Username**: `admin`
-- **Default Password**: `password`
-*Note: You can manage users and roles in the Configuration tab.*
-
-### 2. Creating a Storm (Test)
-1. Navigate to the **Test Editor**.
-2. Write your k6 script or use a provided template (Get Request, Stress Test, etc.).
-3. Click **Launch Storm** to begin the execution.
-
-### 3. Analyzing Results
-- Go to the **Dashboard** to see aggregated metrics.
-- Monitor **Average Latency**, **Peak Virtual Users (VUs)**, and **HTTP Error Rates**.
-- Recent runs are saved in the "Recent Storms" table for historical comparison.
+- **🕒 Sustainability & History**: All metrics are stored in **InfluxDB**, allowing you to track performance trends over time.
+- **🔐 Secure by Design**: RBAC (Role-Based Access Control) with JWT authentication and SQLite persistence.
 
 ---
 
 ## 🛠️ Technology Stack
 
-- **Frontend**: Vue 3, Vite, Tailwind CSS, Lucide Icons, Chart.js.
-- **Backend**: Golang (Gin-Gonic), GORM.
-- **Testing Engine**: k6 (Grafana).
-- **Time-Series DB**: InfluxDB 2.x.
-- **Relational DB**: SQLite (for Users & Test Metadata).
-- **Orchestration**: Docker Compose.
+- **Backend**: Golang (Gin, GORM with Pure-Go SQLite)
+- **Frontend**: Vue 3, Vite, Tailwind CSS, Chart.js
+- **Testing Engine**: k6
+- **Database**: 
+  - **InfluxDB 2.x**: Time-series metrics
+  - **SQLite**: User metadata and RBAC
+- **Infrastructure**: Docker & GitHub Actions
 
 ---
 
-## 🤝 Contributing
+## 🚀 Quick Start
 
-Contributions are welcome! Whether it's adding new k6 templates, improving the dashboard visuals, or optimizing the Go services, feel free to submit a PR.
+### 1. Prerequisites
+- [Docker](https://www.docker.com/get-started)
+- [Docker Compose](https://docs.docker.com/compose/install/)
+
+### 2. Installation
+Clone the repository and start the stack:
+
+```bash
+git clone https://github.com/Muhammad-Ikhwan-Fathulloh/Prahara-Testing-Tool.git
+cd Prahara-Testing-Tool
+docker-compose up -d
+```
+
+### 3. Access the Dashboard
+Once the containers are running, access the services at:
+- **Prahara Web & API**: `http://localhost` (Port 80)
+- **InfluxDB Console**: `http://localhost:8086`
+
+**Default Credentials**:
+- **Username**: `admin`
+- **Password**: `password` (You can register a new user in the app)
 
 ---
 
-## 📄 License
+## 🤖 CI/CD Integration
 
-This project is licensed under the MIT License. Built with ⚡ by the Prahara Team.
+This project is pre-configured with GitHub Actions to build and push the unified image to Docker Hub.
+
+### Setup Secrets
+In your GitHub Repo, go to `Settings > Secrets and variables > Actions` and add:
+1. `DOCKERHUB_USERNAME`: Your Docker Hub username.
+2. `DOCKERHUB_TOKEN`: Your Docker Hub Personal Access Token.
+
+The workflow will automatically build and push to `${DOCKERHUB_USERNAME}/prahara:latest` on every push to the `main` branch.
+
+---
+
+## 📖 Usage Guide
+
+### Dynamic Load Testing (Quick Storm)
+1. Go to the **Dashboard**.
+2. Locate the **Quick Storm** widget at the top.
+3. Enter your target URL, select the method (GET/POST), and set the VUs/Duration.
+4. Hit **Launch** and watch the real-time graphs!
+
+### Endpoint Management
+Use the **URL Registry** to keep track of your team's different endpoints. Categorize them for easier filtering during test planning.
+
+### Scripted Testing
+Write complex k6 scripts in the **Test Editor** section for advanced scenarios like authentication flows or multi-stage load surges.
+
+---
+
+## 🛡️ License
+Distributed under the **MIT License**. See `LICENSE` for more information.
+
+## 🤝 Contribution
+Contributions are welcome! Feel free to open issues or submit pull requests.
+
+---
+Created with ❤️ by the Prahara Team.
