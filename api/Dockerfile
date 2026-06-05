@@ -3,8 +3,11 @@ FROM golang:1.20-alpine AS builder
 
 WORKDIR /app
 
-# Install build dependencies
-RUN apk add --no-cache gcc musl-dev
+# Ensure we use pure Go (no CGO) for maximum compatibility
+ENV CGO_ENABLED=0
+
+# No longer need gcc/musl-dev as we use a pure Go SQLite driver
+# RUN apk add --no-cache gcc musl-dev
 
 # Copy go mod and optionally go.sum
 COPY go.mod ./
