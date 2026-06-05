@@ -6,13 +6,15 @@ WORKDIR /app
 # Install build dependencies
 RUN apk add --no-cache gcc musl-dev
 
-# Copy go mod and sum files
+# Copy go mod and optionally go.sum
 COPY go.mod ./
-# COPY go.sum ./
-RUN go mod download
+# RUN go mod download # Removed as tidy will handle it if sum is missing
 
 # Copy the source code
 COPY . .
+
+# Ensure go.sum is present and correct
+RUN go mod tidy
 
 # Build the application
 RUN go build -o main .
