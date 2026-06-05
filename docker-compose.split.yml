@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  influxdb:
+    image: influxdb:2.7
+    container_name: prahara-influxdb
+    ports:
+      - "8086:8086"
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=admin
+      - DOCKER_INFLUXDB_INIT_PASSWORD=prahara-password
+      - DOCKER_INFLUXDB_INIT_ORG=prahara
+      - DOCKER_INFLUXDB_INIT_BUCKET=prahara
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=prahara-token
+
+  prahara-api:
+    build: ./api
+    container_name: prahara-api
+    ports:
+      - "3000:3000"
+    environment:
+      - INFLUX_URL=http://influxdb:8086
+      - INFLUX_TOKEN=prahara-token
+      - INFLUX_ORG=prahara
+      - INFLUX_BUCKET=prahara
+      - JWT_SECRET=prahara-secret-key
+    depends_on:
+      - influxdb
+    volumes:
+      - prahara-db:/root
+
+  prahara-web:
+    build: ./web
+    container_name: prahara-web
+    ports:
+      - "80:80"
+    depends_on:
+      - prahara-api
+
+volumes:
+  influxdb-data:
+  prahara-db:

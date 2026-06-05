@@ -39,17 +39,33 @@
 - [Docker Compose](https://docs.docker.com/compose/install/)
 
 ### 2. Installation
-Clone the repository and start the stack:
+Clone the repository:
 
 ```bash
 git clone https://github.com/Muhammad-Ikhwan-Fathulloh/Prahara-Testing-Tool.git
 cd Prahara-Testing-Tool
+```
+
+#### Choose Your Deployment Mode:
+
+**A. Unified Mode (Recommended)**
+Runs the entire stack (Web + API) in a single container. Best for simple deployments.
+```bash
 docker-compose up -d
 ```
 
+**B. Split Mode (Modular)**
+Runs Web and API in separate containers. Best for scaling or custom proxying.
+Use the split configuration:
+```bash
+docker-compose -f docker-compose.split.yml up -d
+```
+
 ### 3. Access the Dashboard
-Once the containers are running, access the services at:
-- **Prahara Web & API**: `http://localhost` (Port 80)
+- **Unified Mode**: `http://localhost` (Port 80)
+- **Split Mode**: 
+  - **Frontend**: `http://localhost` (Port 80)
+  - **API**: `http://localhost:3000`
 - **InfluxDB Console**: `http://localhost:8086`
 
 **Default Credentials**:
