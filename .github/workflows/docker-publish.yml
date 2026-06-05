@@ -38,26 +38,30 @@ jobs:
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/prahara-web:latest
 
-      - name: Update Docker Hub Description (Unified)
-        uses: peter-evans/dockerhub-description@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-          repository: ${{ secrets.DOCKERHUB_USERNAME }}/prahara
-          readme-filepath: ./README.md
+      # NOTE: The following steps require your Docker Hub ACCOUNT PASSWORD (not a PAT) 
+      # and the repositories must already exist. If you get "Forbidden", 
+      # it's best to update the description manually on Docker Hub.
+      
+      # - name: Update Docker Hub Description (Unified)
+      #   uses: peter-evans/dockerhub-description@v3
+      #   with:
+      #     username: ${{ secrets.DOCKERHUB_USERNAME }}
+      #     password: ${{ secrets.DOCKERHUB_TOKEN }}
+      #     repository: ${{ secrets.DOCKERHUB_USERNAME }}/prahara
+      #     readme-filepath: ./README.md
 
-      - name: Update Docker Hub Description (API)
-        uses: peter-evans/dockerhub-description@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-          repository: ${{ secrets.DOCKERHUB_USERNAME }}/prahara-api
-          readme-filepath: ./README.md
+      # - name: Update Docker Hub Description (API)
+      #   uses: peter-evans/dockerhub-description@v3
+      #   with:
+      #     username: ${{ secrets.DOCKERHUB_USERNAME }}
+      #     password: ${{ secrets.DOCKERHUB_TOKEN }}
+      #     repository: ${{ secrets.DOCKERHUB_USERNAME }}/prahara-api
+      #     readme-filepath: ./README.md
 
-      - name: Update Docker Hub Description (Web)
-        uses: peter-evans/dockerhub-description@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-          repository: ${{ secrets.DOCKERHUB_USERNAME }}/prahara-web
-          readme-filepath: ./README.md
+      # - name: Update Docker Hub Description (Web)
+      #   uses: peter-evans/dockerhub-description@v3
+      #   with:
+      #     username: ${{ secrets.DOCKERHUB_USERNAME }}
+      #     password: ${{ secrets.DOCKERHUB_TOKEN }}
+      #     repository: ${{ secrets.DOCKERHUB_USERNAME }}/prahara-web
+      #     readme-filepath: ./README.md
