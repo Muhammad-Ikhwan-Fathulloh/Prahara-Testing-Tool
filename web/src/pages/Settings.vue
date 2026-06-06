@@ -39,14 +39,12 @@
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-800">
-              <tr class="hover:bg-slate-800/50 transition-colors">
-                <td class="px-6 py-4 font-medium">admin</td>
-                <td class="px-6 py-4 text-indigo-400 font-bold uppercase text-[10px] tracking-widest">Administrator</td>
-                <td class="px-6 py-4 text-xs text-slate-500">Today, 10:45 AM</td>
+              <tr v-if="user" class="hover:bg-slate-800/50 transition-colors">
+                <td class="px-6 py-4 font-medium">{{ user.username }}</td>
+                <td class="px-6 py-4 text-indigo-400 font-bold uppercase text-[10px] tracking-widest">{{ user.role }}</td>
+                <td class="px-6 py-4 text-xs text-slate-500">Active Session</td>
                 <td class="px-6 py-4 text-right">
-                  <button class="text-slate-500 hover:text-white transition-colors p-1">
-                    <SettingsIcon class="w-4 h-4" />
-                  </button>
+                  <span class="text-[10px] bg-slate-800 px-2 py-1 rounded text-slate-400">CURRENT</span>
                 </td>
               </tr>
             </tbody>
@@ -61,5 +59,8 @@
 </template>
 
 <script setup>
-import { DatabaseIcon, ShieldCheckIcon, SettingsIcon } from 'lucide-vue-next';
+import { ref } from 'vue';
+import { DatabaseIcon, ShieldCheckIcon } from 'lucide-vue-next';
+
+const user = ref(JSON.parse(localStorage.getItem('prahara_user')));
 </script>

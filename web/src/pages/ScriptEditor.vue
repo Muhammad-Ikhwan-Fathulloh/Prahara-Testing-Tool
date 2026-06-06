@@ -6,11 +6,15 @@
         <p class="text-slate-500 text-sm">Design your k6 load testing scenarios</p>
       </div>
       <div class="flex gap-3">
-        <button class="px-4 py-2 bg-slate-800 rounded-lg font-medium hover:bg-slate-700 transition-colors flex items-center gap-2">
-          <SaveIcon class="w-4 h-4" /> Save Script
+        <button @click="saveScript" :disabled="isSaving" class="px-4 py-2 bg-slate-800 rounded-lg font-medium hover:bg-slate-700 transition-colors flex items-center gap-2">
+          <SaveIcon v-if="!isSaving" class="w-4 h-4" />
+          <Loader2Icon v-else class="w-4 h-4 animate-spin" />
+          {{ isSaving ? 'Saving...' : 'Save Script' }}
         </button>
-        <button @click="runTest" :disabled="isRunning" class="px-6 py-2 bg-indigo-600 rounded-lg font-bold hover:bg-indigo-500 transition-colors flex items-center gap-2 shadow-lg shadow-indigo-600/20">
-          <PlayIcon class="w-4 h-4" /> {{ isRunning ? 'Storming...' : 'Launch Storm' }}
+        <button @click="executeTest" :disabled="isRunning" class="px-6 py-2 bg-indigo-600 rounded-lg font-bold hover:bg-indigo-500 transition-colors flex items-center gap-2 shadow-lg shadow-indigo-600/20">
+          <PlayIcon v-if="!isRunning" class="w-4 h-4" />
+          <Loader2Icon v-else class="w-4 h-4 animate-spin" />
+          {{ isRunning ? 'Storming...' : 'Launch Storm' }}
         </button>
       </div>
     </div>
@@ -65,22 +69,68 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
-import { SaveIcon, PlayIcon, InfoIcon, ZapIcon } from 'lucide-vue-next';
+import { ref, onMounted } from 'vue';
+import { SaveIcon, PlayIcon, InfoIcon, ZapIcon, Loader2Icon } from 'lucide-vue-next';
+import { getScripts, createScript, runScript } from '../services/api';
 
+const emit = defineEmits(['test-started']);
 const isRunning = ref(false);
-const scriptContent = ref(`import http from 'k6/http';
-import { sleep } from 'k6';
+const isSaving = ref(false);
+const scripts = ref([]);
+const currentScriptId = ref(null);
+const scriptContent = ref('');
+const scriptName = ref('New Performance Script');
 
-export const options = {
-  vus: 10,
-  duration: '30s',
+const fetchScripts = async () => {
+  try {
+    const response = await getScripts();
+    scripts.value = response.data || [];
+    if (scripts.value.length > 0 && !currentScriptId.value) {
+      loadScript(scripts.value[0]);
+    }
+  } catch (err) {
+    console.error('Failed to fetch scripts:', err);
+  }
 };
 
-export default function () {
-  http.get('https://test.k6.io');
-  sleep(1);
-}`);
+const loadScript = (s) => {
+  currentScriptId.value = s.id;
+  scriptContent.value = s.content;
+  scriptName.value = s.name;
+};
+
+const saveScript = async () => {
+  isSaving.value = true;
+  try {
+    await createScript({
+      name: scriptName.value,
+      content: scriptContent.value
+    });
+    await fetchScripts();
+    alert('Script saved successfully!');
+  } catch (err) {
+    alert('Failed to save script: ' + (err.response?.data?.error || err.message));
+  } finally {
+    isSaving.value = false;
+  }
+};
+
+const executeTest = async () => {
+  if (!currentScriptId.value) {
+    alert('Please save the script first!');
+    return;
+  }
+  
+  isRunning.value = true;
+  try {
+    const response = await runScript(currentScriptId.value);
+    emit('test-started');
+  } catch (err) {
+    alert('Storm failed to ignite: ' + (err.response?.data?.error || err.message));
+  } finally {
+    isRunning.value = false;
+  }
+};
 
 const templates = [
   { 
@@ -95,8 +145,5 @@ const templates = [
   }
 ];
 
-const runTest = () => {
-  isRunning.value = true;
-  setTimeout(() => isRunning.value = false, 3000);
-};
+onMounted(fetchScripts);
 </script>

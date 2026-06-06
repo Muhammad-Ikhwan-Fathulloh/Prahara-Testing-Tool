@@ -15,6 +15,7 @@ import (
 type K6Service struct {
 	DB           *gorm.DB
 	InfluxClient influxdb2.Client
+	Token        string
 	Org          string
 	Bucket       string
 }
@@ -24,6 +25,7 @@ func NewK6Service(db *gorm.DB, url, token, org, bucket string) *K6Service {
 	return &K6Service{
 		DB:           db,
 		InfluxClient: client,
+		Token:        token,
 		Org:          org,
 		Bucket:       bucket,
 	}
@@ -37,6 +39,8 @@ func (s *K6Service) RunTest(scriptID uint) (*models.TestRun, error) {
 
 	testRun := models.TestRun{
 		TestScriptID: scriptID,
+		Name:         script.Name,
+		Method:       "SCRIPT",
 		Status:       "running",
 		InfluxBucket: s.Bucket,
 		StartedAt:    time.Now(),
@@ -50,7 +54,13 @@ func (s *K6Service) RunTest(scriptID uint) (*models.TestRun, error) {
 	// Execute k6
 	go func() {
 		defer os.Remove(scriptPath)
-		cmd := exec.Command("k6", "run", "--out", fmt.Sprintf("influxdb=http://influxdb:8086/%s", s.Bucket), scriptPath)
+		cmd := exec.Command("k6", "run", "--out", "influxdb", scriptPath)
+		cmd.Env = append(os.Environ(),
+			fmt.Sprintf("K6_INFLUXDB_URL=http://influxdb:8086"),
+			fmt.Sprintf("K6_INFLUXDB_ORGANIZATION=%s", s.Org),
+			fmt.Sprintf("K6_INFLUXDB_BUCKET=%s", s.Bucket),
+			fmt.Sprintf("K6_INFLUXDB_TOKEN=%s", s.Token),
+		)
 		err := cmd.Run()
 
 		status := "completed"
@@ -97,6 +107,11 @@ func (s *K6Service) GetMetrics(ctx context.Context, timeRange string) ([]map[str
 
 func (s *K6Service) RunDynamicTest(targetURL, method string, vus int, duration string) (*models.TestRun, error) {
 	testRun := models.TestRun{
+		Name:         fmt.Sprintf("Quick Storm: %s %s", method, targetURL),
+		TargetURL:    targetURL,
+		Method:       method,
+		VUs:          vus,
+		Duration:     duration,
 		Status:       "running",
 		InfluxBucket: s.Bucket,
 		StartedAt:    time.Now(),
@@ -123,7 +138,13 @@ export default function () {
 
 	go func() {
 		defer os.Remove(scriptPath)
-		cmd := exec.Command("k6", "run", "--out", fmt.Sprintf("influxdb=http://influxdb:8086/%s", s.Bucket), scriptPath)
+		cmd := exec.Command("k6", "run", "--out", "influxdb", scriptPath)
+		cmd.Env = append(os.Environ(),
+			fmt.Sprintf("K6_INFLUXDB_URL=http://influxdb:8086"),
+			fmt.Sprintf("K6_INFLUXDB_ORGANIZATION=%s", s.Org),
+			fmt.Sprintf("K6_INFLUXDB_BUCKET=%s", s.Bucket),
+			fmt.Sprintf("K6_INFLUXDB_TOKEN=%s", s.Token),
+		)
 		err := cmd.Run()
 
 		status := "completed"

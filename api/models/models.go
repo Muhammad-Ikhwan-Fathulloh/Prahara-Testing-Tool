@@ -30,6 +30,11 @@ type TestScript struct {
 type TestRun struct {
 	ID           uint           `gorm:"primaryKey" json:"id"`
 	TestScriptID uint           `json:"test_script_id"`
+	Name         string         `json:"name"`
+	TargetURL    string         `json:"target_url"`
+	Method       string         `json:"method"`
+	VUs          int            `json:"vus"`
+	Duration     string         `json:"duration"`
 	Status       string         `json:"status"` // pending, running, completed, failed
 	InfluxBucket string         `json:"influx_bucket"`
 	StartedAt    time.Time      `json:"started_at"`

@@ -16,13 +16,28 @@ import (
 )
 
 func main() {
-	db, err := gorm.Open(sqlite.Open("prahara.db"), &gorm.Config{})
+	// Ensure data directory exists
+	os.MkdirAll("./data", 0755)
+
+	db, err := gorm.Open(sqlite.Open("./data/prahara.db"), &gorm.Config{})
 	if err != nil {
 		panic("failed to connect database")
 	}
 
 	// Migrate the schema
 	db.AutoMigrate(&models.User{}, &models.TestScript{}, &models.TestRun{}, &models.TestingURL{})
+
+	// Seed default admin
+	var admin models.User
+	if err := db.Where("username = ?", "admin").First(&admin).Error; err != nil {
+		hashedPassword, _ := auth.HashPassword("password")
+		admin = models.User{
+			Username: "admin",
+			Password: hashedPassword,
+			Role:     "admin",
+		}
+		db.Create(&admin)
+	}
 
 	influxURL := os.Getenv("INFLUX_URL")
 	if influxURL == "" {
@@ -32,6 +47,11 @@ func main() {
 
 	r := gin.Default()
 	r.Use(cors.Default())
+
+	// Health check
+	r.GET("/api/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
 
 	// Auth Routes
 	r.POST("/api/auth/register", func(c *gin.Context) {
@@ -44,8 +64,14 @@ func main() {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		hashed, _ := auth.HashPassword(input.Password)
-		user := models.User{Username: input.Username, Password: hashed, Role: input.Role}
+
+		hashedPassword, _ := auth.HashPassword(input.Password)
+		user := models.User{
+			Username: input.Username,
+			Password: hashedPassword,
+			Role:     input.Role,
+		}
+
 		if err := db.Create(&user).Error; err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Username exists"})
 			return
@@ -111,6 +137,13 @@ func main() {
 		c.JSON(http.StatusOK, metrics)
 	})
 
+	// Test Runs History
+	protected.GET("/runs", func(c *gin.Context) {
+		var runs []models.TestRun
+		db.Order("created_at desc").Limit(20).Find(&runs)
+		c.JSON(http.StatusOK, runs)
+	})
+
 	// URL Management Routes
 	protected.GET("/urls", func(c *gin.Context) {
 		category := c.Query("category")
@@ -152,17 +185,33 @@ func main() {
 		c.JSON(http.StatusOK, run)
 	})
 
+	protected.DELETE("/urls/:id", func(c *gin.Context) {
+		id, _ := strconv.Atoi(c.Param("id"))
+		db.Delete(&models.TestingURL{}, id)
+		c.Status(http.StatusNoContent)
+	})
+
 	// Serve static files from Vue dist
-	// In production, this will be in /app/web/dist
-	r.Static("/assets", "./web/dist/assets")
+	// r.Static("/assets", "./web/dist/assets") // Removed in favor of more robust NoRoute handling
 	r.StaticFile("/favicon.ico", "./web/dist/favicon.ico")
 
 	r.NoRoute(func(c *gin.Context) {
-		// If the request is for /api, don't serve index.html
-		if len(c.Request.URL.Path) >= 4 && c.Request.URL.Path[:4] == "/api" {
+		path := c.Request.URL.Path
+
+		// 1. Try to serve exact file from web/dist
+		filePath := "./web/dist" + path
+		if _, err := os.Stat(filePath); err == nil {
+			c.File(filePath)
+			return
+		}
+
+		// 2. If it's an API route, 404
+		if len(path) >= 4 && path[:4] == "/api" {
 			c.JSON(http.StatusNotFound, gin.H{"error": "API route not found"})
 			return
 		}
+
+		// 3. Fallback to index.html for SPA routing
 		c.File("./web/dist/index.html")
 	})
 

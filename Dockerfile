@@ -1,24 +1,41 @@
 # Stage 1: Build Vue Frontend
-FROM node:18-alpine AS frontend-builder
+FROM node:20-alpine AS frontend-builder
 WORKDIR /web
-COPY web/package*.json ./
-RUN npm install
+
+# Copy package files
+COPY web/package.json ./
+
+# Install dependencies with legacy peer deps flag for compatibility
+RUN npm install --legacy-peer-deps
+
+# Copy source code
 COPY web/ ./
+
+# Build the frontend
 RUN npm run build
 
 # Stage 2: Build Go Backend
-FROM golang:1.20-alpine AS backend-builder
+FROM golang:1.21-alpine AS backend-builder
 WORKDIR /app
 ENV CGO_ENABLED=0
-COPY api/go.mod api/go.sum* ./
-RUN go mod download
-COPY api/ ./
-# We need the dist folder for the static file serving logic in Go (if checked at build time)
-# but actually our Go code just references the path.
-RUN go build -o main .
 
-# Stage 3: Runner
+# Copy go module files
+COPY api/go.mod ./
+COPY api/go.sum* ./
+
+# Download dependencies
+RUN go mod download || true
+
+# Copy API source code
+COPY api/ ./
+
+# Tidy and build
+RUN go mod tidy && go build -o main .
+
+# Stage 3: Production Runner
 FROM alpine:latest
+
+# Install runtime dependencies
 RUN apk add --no-cache ca-certificates wget
 
 # Install k6
@@ -27,12 +44,12 @@ RUN wget https://github.com/grafana/k6/releases/download/v0.45.0/k6-v0.45.0-linu
     && mv k6-v0.45.0-linux-amd64/k6 /usr/bin/k6 \
     && rm -rf k6-v0.45.0-linux-amd64*
 
-WORKDIR /root/
+WORKDIR /app
 
 # Copy Go binary
 COPY --from=backend-builder /app/main .
 
-# Copy Frontend build to the expected location for the Go server
+# Copy Frontend build
 COPY --from=frontend-builder /web/dist ./web/dist
 
 EXPOSE 3000

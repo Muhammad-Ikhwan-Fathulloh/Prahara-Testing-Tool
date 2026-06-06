@@ -30,7 +30,7 @@ services:
     depends_on:
       - influxdb
     volumes:
-      - prahara-db:/root
+      - prahara-db:/app/data
 
   prahara-web:
     build: ./web

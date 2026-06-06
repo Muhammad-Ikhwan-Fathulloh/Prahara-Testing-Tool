@@ -63,8 +63,8 @@
 
       <div v-else>
         <Dashboard v-if="currentTab === 'dashboard'" />
-        <URLManager v-if="currentTab === 'urls'" />
-        <ScriptEditor v-if="currentTab === 'editor'" />
+        <URLManager v-if="currentTab === 'urls'" @test-started="currentTab = 'dashboard'" />
+        <ScriptEditor v-if="currentTab === 'editor'" @test-started="currentTab = 'dashboard'" />
         <Settings v-if="currentTab === 'settings'" />
       </div>
     </main>
@@ -80,10 +80,32 @@
           </div>
           <div>
             <label class="block text-sm font-medium text-slate-400 mb-1">Password</label>
-            <input v-model="loginForm.password" type="password" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 transition-all" />
+            <div class="relative">
+              <input 
+                v-model="loginForm.password" 
+                :type="showPassword ? 'text' : 'password'" 
+                class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 transition-all pr-12" 
+              />
+              <button 
+                type="button" 
+                @click="showPassword = !showPassword"
+                class="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-500 hover:text-slate-300 transition-colors"
+              >
+                <EyeIcon v-if="!showPassword" class="w-4 h-4" />
+                <EyeOffIcon v-else class="w-4 h-4" />
+              </button>
+            </div>
           </div>
-          <button @click="handleLogin" class="w-full bg-indigo-600 py-3 rounded-lg font-bold mt-4 hover:bg-indigo-500 transition-colors">
-            Authorize
+          <div v-if="loginError" class="bg-rose-500/10 border border-rose-500/20 text-rose-400 p-3 rounded-lg text-xs font-medium mb-4">
+            {{ loginError }}
+          </div>
+          <button 
+            @click="handleLogin" 
+            :disabled="isAuthenticating"
+            class="w-full bg-indigo-600 py-3 rounded-lg font-bold mt-4 hover:bg-indigo-500 transition-colors flex items-center justify-center gap-2"
+          >
+            <Loader2Icon v-if="isAuthenticating" class="w-4 h-4 animate-spin" />
+            {{ isAuthenticating ? 'Authenticating...' : 'Authorize' }}
           </button>
         </div>
       </div>
@@ -92,16 +114,20 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue';
-import { ZapIcon, LogOutIcon, BarChart3Icon, CodeIcon, SettingsIcon } from 'lucide-vue-next';
+import { ref, reactive, onMounted } from 'vue';
+import { ZapIcon, LogOutIcon, Loader2Icon, EyeIcon, EyeOffIcon } from 'lucide-vue-next';
 import Dashboard from './pages/Dashboard.vue';
 import URLManager from './pages/URLManager.vue';
 import ScriptEditor from './pages/ScriptEditor.vue';
 import Settings from './pages/Settings.vue';
+import { login } from './services/api';
 
 const user = ref(JSON.parse(localStorage.getItem('prahara_user')));
 const currentTab = ref('dashboard');
 const showLogin = ref(false);
+const showPassword = ref(false);
+const isAuthenticating = ref(false);
+const loginError = ref('');
 
 const tabs = [
   { id: 'dashboard', name: 'Dashboard' },
@@ -110,19 +136,37 @@ const tabs = [
   { id: 'settings', name: 'Configuration' }
 ];
 
-const loginForm = reactive({ username: 'admin', password: 'password' });
+const loginForm = reactive({ username: '', password: '' });
 
-const handleLogin = () => {
-  // Mock login for now, will connect to API later
-  const mockUser = { username: loginForm.username, role: 'admin' };
-  user.value = mockUser;
-  localStorage.setItem('prahara_user', JSON.stringify(mockUser));
-  showLogin.value = false;
+const handleLogin = async () => {
+  if (!loginForm.username || !loginForm.password) return;
+  
+  isAuthenticating.value = true;
+  loginError.value = '';
+  
+  try {
+    const response = await login(loginForm.username, loginForm.password);
+    const { token, user: userData } = response.data;
+    
+    localStorage.setItem('prahara_token', token);
+    localStorage.setItem('prahara_user', JSON.stringify(userData));
+    
+    user.value = userData;
+    showLogin.value = false;
+    loginForm.username = '';
+    loginForm.password = '';
+  } catch (err) {
+    loginError.value = err.response?.data?.error || 'Authentication failed';
+  } finally {
+    isAuthenticating.value = false;
+  }
 };
 
 const logout = () => {
   user.value = null;
   localStorage.removeItem('prahara_user');
+  localStorage.removeItem('prahara_token');
+  currentTab.value = 'dashboard';
 };
 </script>
 

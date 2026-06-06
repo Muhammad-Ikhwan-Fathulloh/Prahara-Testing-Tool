@@ -1,17 +1,14 @@
 # Build stage
-FROM golang:1.20-alpine AS builder
+FROM golang:1.21-alpine AS builder
 
 WORKDIR /app
 
 # Ensure we use pure Go (no CGO) for maximum compatibility
 ENV CGO_ENABLED=0
 
-# No longer need gcc/musl-dev as we use a pure Go SQLite driver
-# RUN apk add --no-cache gcc musl-dev
-
-# Copy go mod and optionally go.sum
+# Copy go mod files
 COPY go.mod ./
-# RUN go mod download # Removed as tidy will handle it if sum is missing
+COPY go.sum* ./
 
 # Copy the source code
 COPY . .

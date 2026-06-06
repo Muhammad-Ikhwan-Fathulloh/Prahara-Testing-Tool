@@ -64,7 +64,9 @@
 <script setup>
 import { ref, reactive } from 'vue';
 import { ZapIcon, PlayIcon, ActivityIcon } from 'lucide-vue-next';
+import { runDynamicTest } from '../services/api';
 
+const emit = defineEmits(['test-started']);
 const isLaunching = ref(false);
 const methods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'];
 
@@ -75,16 +77,18 @@ const config = reactive({
   duration: '30s'
 });
 
-const launchStorm = () => {
+const launchStorm = async () => {
   if (!config.url) return;
   isLaunching.value = true;
   
-  // Connect to API later
-  console.log('Launching Dynamic Storm:', config);
-  
-  setTimeout(() => {
+  try {
+    await runDynamicTest(config);
+    emit('test-started');
+    config.url = '';
+  } catch (err) {
+    alert('Failed to ignite storm: ' + (err.response?.data?.error || err.message));
+  } finally {
     isLaunching.value = false;
-    // Notify user of success
-  }, 2000);
+  }
 };
 </script>

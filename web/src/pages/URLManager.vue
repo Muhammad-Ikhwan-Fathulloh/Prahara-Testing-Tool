@@ -26,83 +26,183 @@
       </button>
     </div>
 
-    <!-- URL Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      <div v-for="item in filteredUrls" :key="item.id" class="bg-slate-900 border border-slate-800 p-6 rounded-2xl group hover:border-indigo-500/50 transition-all shadow-xl">
-        <div class="flex justify-between items-start mb-4">
-          <span :class="[
-            'px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-tighter border',
-            getCategoryColor(item.category)
-          ]">
-            {{ item.category }}
-          </span>
-          <button @click="deleteUrl(item.id)" class="text-slate-600 hover:text-rose-400 transition-colors opacity-0 group-hover:opacity-100">
-            <TrashIcon class="w-4 h-4" />
-          </button>
+    <!-- URL Grid / Table Container -->
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+      <table v-if="filteredUrls.length > 0" class="w-full text-left">
+        <thead class="bg-slate-950/50 text-slate-500 text-xs uppercase font-bold">
+          <tr>
+            <th class="px-6 py-4">Endpoint</th>
+            <th class="px-6 py-4 text-center">Category</th>
+            <th class="px-6 py-4 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-800">
+          <tr v-for="url in filteredUrls" :key="url.id" class="hover:bg-slate-800/50 transition-colors">
+            <td class="px-6 py-4">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center flex-shrink-0">
+                  <LinkIcon class="w-4 h-4 text-indigo-400" />
+                </div>
+                <div class="min-w-0">
+                  <p class="font-medium truncate">{{ url.name }}</p>
+                  <p class="text-xs text-slate-500 font-mono truncate">{{ url.url }}</p>
+                </div>
+              </div>
+            </td>
+            <td class="px-6 py-4 text-center">
+              <span :class="['px-2 py-1 rounded text-[10px] font-bold border whitespace-nowrap', getCategoryColor(url.category)]">
+                {{ url.category }}
+              </span>
+            </td>
+            <td class="px-6 py-4 text-right">
+              <div class="flex justify-end gap-2">
+                <button @click="openTestModal(url)" class="p-2 text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors" title="Quick Test">
+                  <PlayIcon class="w-4 h-4" />
+                </button>
+                <button @click="copyToClipboard(url.url)" class="p-2 text-slate-400 hover:bg-slate-800 rounded-lg transition-colors">
+                  <CopyIcon class="w-4 h-4" />
+                </button>
+                <button @click="deleteUrl(url.id)" class="p-2 text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors">
+                  <TrashIcon class="w-4 h-4" />
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      
+      <!-- Empty State -->
+      <div v-if="filteredUrls.length === 0" class="py-20 flex flex-col items-center justify-center text-slate-600">
+        <LinkIcon class="w-12 h-12 mb-4 opacity-20" />
+        <p class="text-lg font-medium">No URLs found in this category</p>
+      </div>
+    </div>
+
+    <!-- Add URL Modal -->
+    <div v-if="showAddModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+      <div class="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+        <div class="p-6 border-b border-slate-800 bg-gradient-to-r from-indigo-600/10 to-transparent">
+          <h3 class="text-xl font-bold">Register New Endpoint</h3>
+          <p class="text-slate-500 text-sm">Add a new URL to your testing registry</p>
         </div>
-        <h3 class="font-bold text-lg text-white mb-1">{{ item.name }}</h3>
-        <p class="text-xs font-mono text-slate-500 break-all mb-4">{{ item.url }}</p>
-        <div class="flex gap-2">
-          <button @click="copyToClipboard(item.url)" class="flex-1 py-2 bg-slate-800 rounded-lg text-xs font-bold hover:bg-slate-700 transition-colors flex items-center justify-center gap-2">
-            <CopyIcon class="w-3.5 h-3.5" /> Copy URL
+        
+        <div class="p-6 space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-slate-400 mb-1">Friendly Name</label>
+            <input v-model="newUrl.name" type="text" placeholder="e.g. Auth Service" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 focus:ring-2 focus:ring-indigo-500 transition-all font-medium text-white" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-400 mb-1">Target URL</label>
+            <input v-model="newUrl.url" type="url" placeholder="https://api.example.com" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 focus:ring-2 focus:ring-indigo-500 transition-all font-mono text-white text-sm" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-400 mb-1">Category</label>
+            <select v-model="newUrl.category" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 focus:ring-2 focus:ring-indigo-500 transition-all font-medium text-white">
+              <option v-for="cat in categories.filter(c => c !== 'ALL')" :key="cat" :value="cat">{{ cat }}</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="p-6 bg-slate-800/30 border-t border-slate-800 flex gap-3">
+          <button @click="showAddModal = false" class="flex-1 px-4 py-2 bg-slate-800 rounded-xl font-medium hover:bg-slate-700 transition-colors">
+            Cancel
           </button>
-          <a :href="item.url" target="_blank" class="p-2 bg-slate-800 rounded-lg hover:bg-slate-700 transition-colors">
-            <ExternalLinkIcon class="w-4 h-4 text-indigo-400" />
-          </a>
+          <button @click="saveUrl" :disabled="isSaving" class="flex-2 px-6 py-2 bg-indigo-600 rounded-xl font-bold hover:bg-indigo-500 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20">
+            <Loader2Icon v-if="isSaving" class="w-4 h-4 animate-spin" />
+            {{ isSaving ? 'Saving...' : 'Register URL' }}
+          </button>
         </div>
       </div>
     </div>
 
-    <!-- Empty State -->
-    <div v-if="filteredUrls.length === 0" class="py-20 flex flex-col items-center justify-center border-2 border-dashed border-slate-800 rounded-3xl text-slate-600">
-      <LinkIcon class="w-12 h-12 mb-4 opacity-20" />
-      <p class="text-lg font-medium">No URLs found in this category</p>
-    </div>
+    <!-- Quick Test Modal -->
+    <div v-if="showTestModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+      <div class="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+        <div class="p-6 border-b border-slate-800 bg-gradient-to-r from-emerald-600/10 to-transparent">
+          <div class="flex items-center gap-3 mb-1">
+            <ZapIcon class="w-5 h-5 text-emerald-400" />
+            <h3 class="text-xl font-bold">Quick Storm Test</h3>
+          </div>
+          <p class="text-slate-500 text-sm">Launch an instant load test on this endpoint</p>
+        </div>
+        
+        <div class="p-6 space-y-4">
+          <div class="bg-slate-800/50 p-4 rounded-xl border border-slate-700">
+            <p class="text-xs text-slate-500 uppercase font-bold mb-1">Target Endpoint</p>
+            <p class="font-medium text-emerald-400 truncate">{{ selectedUrl?.url }}</p>
+          </div>
 
-    <!-- Add Modal -->
-    <div v-if="showAddModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-8 shadow-2xl animate-in zoom-in-95 duration-300">
-        <h3 class="text-2xl font-bold mb-6">Register New Endpoint</h3>
-        <div class="space-y-4">
-          <div>
-            <label class="block text-sm font-medium text-slate-400 mb-1">Friendly Name</label>
-            <input v-model="newUrl.name" type="text" placeholder="e.g. Auth Service Production" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 transition-all" />
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-slate-400 mb-1 flex items-center gap-2">
+                <UsersIcon class="w-3.5 h-3.5" /> Virtual Users
+              </label>
+              <input v-model.number="testConfig.vus" type="number" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 focus:ring-2 focus:ring-emerald-500 transition-all font-medium text-white" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-slate-400 mb-1 flex items-center gap-2">
+                <TimerIcon class="w-3.5 h-3.5" /> Duration
+              </label>
+              <input v-model="testConfig.duration" type="text" placeholder="30s" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 focus:ring-2 focus:ring-emerald-500 transition-all font-medium text-white" />
+            </div>
           </div>
-          <div>
-            <label class="block text-sm font-medium text-slate-400 mb-1">Target URL</label>
-            <input v-model="newUrl.url" type="text" placeholder="https://api.example.com/v1" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 transition-all font-mono text-sm" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-slate-400 mb-1">Category</label>
-            <select v-model="newUrl.category" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 transition-all">
-              <option v-for="cat in categories.slice(1)" :key="cat" :value="cat">{{ cat }}</option>
-            </select>
-          </div>
-          <div class="flex gap-3 mt-6">
-            <button @click="showAddModal = false" class="flex-1 py-3 bg-slate-800 rounded-lg font-bold hover:bg-slate-700 transition-colors">Cancel</button>
-            <button @click="saveUrl" class="flex-1 py-3 bg-indigo-600 rounded-lg font-bold hover:bg-indigo-500 transition-colors">Save Endpoint</button>
-          </div>
+        </div>
+
+        <div class="p-6 bg-slate-800/30 border-t border-slate-800 flex gap-3">
+          <button @click="showTestModal = false" class="flex-1 px-4 py-2 bg-slate-800 rounded-xl font-medium hover:bg-slate-700 transition-colors">
+            Cancel
+          </button>
+          <button @click="runUrlTest" :disabled="isTesting" class="flex-2 px-6 py-2 bg-emerald-600 rounded-xl font-bold hover:bg-emerald-500 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20">
+            <PlayIcon v-if="!isTesting" class="w-4 h-4" />
+            <Loader2Icon v-else class="w-4 h-4 animate-spin" />
+            {{ isTesting ? 'Launching...' : 'Ignite Storm' }}
+          </button>
         </div>
       </div>
     </div>
   </div>
 </template>
 
-<script setup>
-import { ref, computed } from 'vue';
-import { PlusIcon, TrashIcon, CopyIcon, ExternalLinkIcon, LinkIcon } from 'lucide-vue-next';
 
+<script setup>
+import { ref, computed, onMounted, reactive } from 'vue';
+import { 
+  PlusIcon, TrashIcon, CopyIcon, LinkIcon, 
+  Loader2Icon, PlayIcon, ZapIcon, TimerIcon, UsersIcon 
+} from 'lucide-vue-next';
+import { getUrls, createUrl, deleteUrl as removeUrl, runDynamicTest } from '../services/api';
+
+const emit = defineEmits(['test-started']);
 const filter = ref('ALL');
 const showAddModal = ref(false);
+const showTestModal = ref(false);
+const isSaving = ref(false);
+const isLoading = ref(false);
+const isTesting = ref(false);
 const categories = ['ALL', 'FRONTEND', 'BACKEND', 'API', 'STAGING', 'PRODUCTION'];
 
-const urls = ref([
-  { id: 1, name: 'Main Frontend', url: 'https://prahara.example.com', category: 'FRONTEND' },
-  { id: 2, name: 'Auth Microservice', url: 'https://auth.api.example.com', category: 'BACKEND' },
-  { id: 3, name: 'Payment Gateway', url: 'https://pay.api.example.com', category: 'API' }
-]);
+const urls = ref([]);
+const newUrl = ref({ name: '', url: '', category: 'API' });
+const selectedUrl = ref(null);
+const testConfig = reactive({
+  vus: 10,
+  duration: '30s',
+  method: 'GET'
+});
 
-const newUrl = ref({ name: '', url: '', category: 'FRONTEND' });
+const fetchUrls = async () => {
+  isLoading.value = true;
+  try {
+    const response = await getUrls();
+    urls.value = response.data || [];
+  } catch (err) {
+    console.error('Failed to fetch URLs:', err);
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+onMounted(fetchUrls);
 
 const filteredUrls = computed(() => {
   if (filter.value === 'ALL') return urls.value;
@@ -120,19 +220,54 @@ const getCategoryColor = (cat) => {
   return colors[cat] || 'bg-slate-500/10 text-slate-400 border-slate-500/20';
 };
 
-const saveUrl = () => {
+const saveUrl = async () => {
   if (!newUrl.value.name || !newUrl.value.url) return;
-  urls.value.push({ ...newUrl.value, id: Date.now() });
-  newUrl.value = { name: '', url: '', category: 'FRONTEND' };
-  showAddModal.value = false;
+  isSaving.value = true;
+  try {
+    await createUrl(newUrl.value);
+    await fetchUrls();
+    newUrl.value = { name: '', url: '', category: 'API' };
+    showAddModal.value = false;
+  } catch (err) {
+    console.error('Failed to save URL:', err);
+  } finally {
+    isSaving.value = false;
+  }
 };
 
-const deleteUrl = (id) => {
-  urls.value = urls.value.filter(u => u.id !== id);
+const deleteUrl = async (id) => {
+  if (!confirm('Are you sure you want to remove this endpoint?')) return;
+  try {
+    await removeUrl(id);
+    await fetchUrls();
+  } catch (err) {
+    console.error('Failed to delete URL:', err);
+  }
+};
+
+const openTestModal = (url) => {
+  selectedUrl.value = url;
+  showTestModal.value = true;
+};
+
+const runUrlTest = async () => {
+  if (!selectedUrl.value) return;
+  isTesting.value = true;
+  try {
+    await runDynamicTest({
+      url: selectedUrl.value.url,
+      ...testConfig
+    });
+    showTestModal.value = false;
+    emit('test-started');
+  } catch (err) {
+    alert('Failed to launch test: ' + (err.response?.data?.error || err.message));
+  } finally {
+    isTesting.value = false;
+  }
 };
 
 const copyToClipboard = (text) => {
   navigator.clipboard.writeText(text);
-  // Ideally show a toast here
 };
 </script>
