@@ -30,15 +30,17 @@ export const runScript = (id) => api.post(`/scripts/${id}/run`);
 // URLs
 export const getUrls = (category) => api.get('/urls', { params: category ? { category } : {} });
 export const createUrl = (data) => api.post('/urls', data);
+export const updateUrl = (id, data) => api.put(`/urls/${id}`, data);
 export const deleteUrl = (id) => api.delete(`/urls/${id}`);
 
 // Dynamic Test (Quick Storm)
 export const runDynamicTest = (data) => api.post('/run-dynamic', data);
 
 // Metrics
-export const getMetrics = (range) => api.get('/metrics', { params: { range } });
+export const getMetrics = (range, category) => api.get('/metrics', { params: { range, category } });
 
 // Test Runs
 export const getRuns = () => api.get('/runs');
+export const getRunMetrics = (id) => api.get(`/runs/${id}/metrics`);
 
 export default api;

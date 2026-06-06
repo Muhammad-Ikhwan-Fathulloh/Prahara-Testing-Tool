@@ -65,6 +65,8 @@
         <Dashboard v-if="currentTab === 'dashboard'" />
         <URLManager v-if="currentTab === 'urls'" @test-started="currentTab = 'dashboard'" />
         <ScriptEditor v-if="currentTab === 'editor'" @test-started="currentTab = 'dashboard'" />
+        <UserManagement v-if="currentTab === 'users_mgmt'" />
+        <Learn v-if="currentTab === 'learn'" />
         <Settings v-if="currentTab === 'settings'" />
       </div>
     </main>
@@ -114,12 +116,14 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, onMounted, computed } from 'vue';
 import { ZapIcon, LogOutIcon, Loader2Icon, EyeIcon, EyeOffIcon } from 'lucide-vue-next';
 import Dashboard from './pages/Dashboard.vue';
 import URLManager from './pages/URLManager.vue';
 import ScriptEditor from './pages/ScriptEditor.vue';
+import UserManagement from './pages/UserManagement.vue';
 import Settings from './pages/Settings.vue';
+import Learn from './pages/Learn.vue';
 import { login } from './services/api';
 
 const user = ref(JSON.parse(localStorage.getItem('prahara_user')));
@@ -129,12 +133,19 @@ const showPassword = ref(false);
 const isAuthenticating = ref(false);
 const loginError = ref('');
 
-const tabs = [
-  { id: 'dashboard', name: 'Dashboard' },
-  { id: 'urls', name: 'URL Registry' },
-  { id: 'editor', name: 'Test Editor' },
-  { id: 'settings', name: 'Configuration' }
-];
+const tabs = computed(() => {
+  const base = [
+    { id: 'dashboard', name: 'Dashboard' },
+    { id: 'urls', name: 'URL Registry' },
+    { id: 'editor', name: 'Test Editor' },
+    { id: 'learn', name: 'Learning Center' },
+  ];
+  if (user.value?.role === 'admin') {
+    base.push({ id: 'users_mgmt', name: 'Users' });
+  }
+  base.push({ id: 'settings', name: 'Configuration' });
+  return base;
+});
 
 const loginForm = reactive({ username: '', password: '' });
 

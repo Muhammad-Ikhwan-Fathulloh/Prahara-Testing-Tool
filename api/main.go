@@ -8,10 +8,12 @@ import (
 	"prahara-api/models"
 	"prahara-api/services"
 	"strconv"
+	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
@@ -24,26 +26,16 @@ func main() {
 		panic("failed to connect database")
 	}
 
-	// Migrate the schema
+	// Auto Migrate
 	db.AutoMigrate(&models.User{}, &models.TestScript{}, &models.TestRun{}, &models.TestingURL{})
 
-	// Seed default admin
-	var admin models.User
-	if err := db.Where("username = ?", "admin").First(&admin).Error; err != nil {
-		hashedPassword, _ := auth.HashPassword("password")
-		admin = models.User{
-			Username: "admin",
-			Password: hashedPassword,
-			Role:     "admin",
-		}
-		db.Create(&admin)
+	// Initialize K6 Service
+	k6Service := &services.K6Service{
+		DB:     db,
+		Bucket: "prahara-metrics",
+		Org:    "prahara-org",
+		Token:  "prahara-token-1234567890",
 	}
-
-	influxURL := os.Getenv("INFLUX_URL")
-	if influxURL == "" {
-		influxURL = "http://influxdb:8086"
-	}
-	k6Service := services.NewK6Service(db, influxURL, "prahara-token", "prahara", "prahara")
 
 	r := gin.Default()
 	r.Use(cors.Default())
@@ -97,7 +89,15 @@ func main() {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
 			return
 		}
-		token, _ := auth.GenerateToken(user.ID, user.Username, user.Role)
+		now := time.Now()
+		user.LastLogin = &now
+		db.Save(&user)
+
+		token, err := auth.GenerateToken(user.ID, user.Username, user.Role)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Token generation failed"})
+			return
+		}
 		c.JSON(http.StatusOK, gin.H{"token": token, "user": gin.H{"id": user.ID, "username": user.Username, "role": user.Role}})
 	})
 
@@ -129,7 +129,8 @@ func main() {
 
 	protected.GET("/metrics", func(c *gin.Context) {
 		timeRange := c.DefaultQuery("range", "-1h")
-		metrics, err := k6Service.GetMetrics(context.Background(), timeRange)
+		category := c.Query("category")
+		metrics, err := k6Service.GetMetrics(c.Request.Context(), timeRange, category)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -144,40 +145,154 @@ func main() {
 		c.JSON(http.StatusOK, runs)
 	})
 
-	// URL Management Routes
-	protected.GET("/urls", func(c *gin.Context) {
-		category := c.Query("category")
-		var urls []models.TestingURL
-		query := db
-		if category != "" {
-			query = query.Where("category = ?", category)
-		}
-		query.Find(&urls)
-		c.JSON(http.StatusOK, urls)
-	})
-
-	protected.POST("/urls", func(c *gin.Context) {
-		var testingURL models.TestingURL
-		if err := c.ShouldBindJSON(&testingURL); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	protected.GET("/runs/:id/metrics", func(c *gin.Context) {
+		id, _ := strconv.Atoi(c.Param("id"))
+		metrics, err := k6Service.GetRunMetrics(context.Background(), uint(id))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		db.Create(&testingURL)
-		c.JSON(http.StatusCreated, testingURL)
+		c.JSON(http.StatusOK, metrics)
 	})
 
-	protected.POST("/run-dynamic", func(c *gin.Context) {
+	protected.GET("/runs/:id/logs", func(c *gin.Context) {
+		id := c.Param("id")
+		var run models.TestRun
+		if err := db.First(&run, id).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Run not found"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"logs": run.Logs})
+	})
+
+	// User Management (Admin Only)
+	protected.GET("/users", func(c *gin.Context) {
+		if c.GetString("role") != "admin" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Forbidden"})
+			return
+		}
+		var users []models.User
+		db.Find(&users)
+		c.JSON(http.StatusOK, users)
+	})
+
+	protected.POST("/users", func(c *gin.Context) {
+		if c.GetString("role") != "admin" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Forbidden"})
+			return
+		}
 		var input struct {
-			URL      string `json:"url"`
-			Method   string `json:"method"`
-			VUs      int    `json:"vus"`
-			Duration string `json:"duration"`
+			Username string `json:"username"`
+			Password string `json:"password"`
+			Role     string `json:"role"`
 		}
 		if err := c.ShouldBindJSON(&input); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		run, err := k6Service.RunDynamicTest(input.URL, input.Method, input.VUs, input.Duration)
+		hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
+		user := models.User{
+			Username: input.Username,
+			Password: string(hashedPassword),
+			Role:     input.Role,
+		}
+		if err := db.Create(&user).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusCreated, user)
+	})
+
+	protected.DELETE("/users/:id", func(c *gin.Context) {
+		if c.GetString("role") != "admin" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Forbidden"})
+			return
+		}
+		id := c.Param("id")
+		db.Delete(&models.User{}, id)
+		c.JSON(http.StatusOK, gin.H{"message": "User deleted"})
+	})
+
+	// URL Management Routes
+	protected.GET("/urls", func(c *gin.Context) {
+		category := c.Query("category")
+		var urls []models.TestingURL
+		if category != "" && category != "ALL" {
+			db.Where("category = ?", category).Find(&urls)
+		} else {
+			db.Find(&urls)
+		}
+		c.JSON(http.StatusOK, urls)
+	})
+
+	protected.POST("/urls", func(c *gin.Context) {
+		var input struct {
+			Name     string `json:"name"`
+			URL      string `json:"url"`
+			Category string `json:"category"`
+			Script   string `json:"script"`
+		}
+		if err := c.ShouldBindJSON(&input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		url := models.TestingURL{
+			Name:     input.Name,
+			URL:      input.URL,
+			Category: input.Category,
+			Script:   input.Script,
+		}
+		db.Create(&url)
+		c.JSON(http.StatusCreated, url)
+	})
+
+	protected.PUT("/urls/:id", func(c *gin.Context) {
+		id := c.Param("id")
+		var input struct {
+			Name     string `json:"name"`
+			URL      string `json:"url"`
+			Category string `json:"category"`
+			Script   string `json:"script"`
+		}
+		if err := c.ShouldBindJSON(&input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		var url models.TestingURL
+		if err := db.First(&url, id).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "URL not found"})
+			return
+		}
+		db.Model(&url).Updates(models.TestingURL{
+			Name:     input.Name,
+			URL:      input.URL,
+			Category: input.Category,
+			Script:   input.Script,
+		})
+		c.JSON(http.StatusOK, url)
+	})
+
+	protected.DELETE("/urls/:id", func(c *gin.Context) {
+		id := c.Param("id")
+		db.Delete(&models.TestingURL{}, id)
+		c.JSON(http.StatusOK, gin.H{"message": "URL deleted"})
+	})
+
+	protected.POST("/run-dynamic", func(c *gin.Context) {
+		var input struct {
+			URL           string `json:"url"`
+			Method        string `json:"method"`
+			VUs           int    `json:"vus"`
+			Duration      string `json:"duration"`
+			Category      string `json:"category"`
+			ScriptID      uint   `json:"script_id"`
+			ScriptContent string `json:"script_content"`
+		}
+		if err := c.ShouldBindJSON(&input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		run, err := k6Service.RunDynamicTest(db, input.URL, input.Method, input.VUs, input.Duration, input.Category, input.ScriptID, input.ScriptContent)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -185,35 +300,5 @@ func main() {
 		c.JSON(http.StatusOK, run)
 	})
 
-	protected.DELETE("/urls/:id", func(c *gin.Context) {
-		id, _ := strconv.Atoi(c.Param("id"))
-		db.Delete(&models.TestingURL{}, id)
-		c.Status(http.StatusNoContent)
-	})
-
-	// Serve static files from Vue dist
-	// r.Static("/assets", "./web/dist/assets") // Removed in favor of more robust NoRoute handling
-	r.StaticFile("/favicon.ico", "./web/dist/favicon.ico")
-
-	r.NoRoute(func(c *gin.Context) {
-		path := c.Request.URL.Path
-
-		// 1. Try to serve exact file from web/dist
-		filePath := "./web/dist" + path
-		if _, err := os.Stat(filePath); err == nil {
-			c.File(filePath)
-			return
-		}
-
-		// 2. If it's an API route, 404
-		if len(path) >= 4 && path[:4] == "/api" {
-			c.JSON(http.StatusNotFound, gin.H{"error": "API route not found"})
-			return
-		}
-
-		// 3. Fallback to index.html for SPA routing
-		c.File("./web/dist/index.html")
-	})
-
-	r.Run(":3000")
+	r.Run(":8080")
 }

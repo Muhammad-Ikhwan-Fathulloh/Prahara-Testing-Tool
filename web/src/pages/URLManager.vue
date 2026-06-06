@@ -132,7 +132,12 @@
             <p class="font-medium text-emerald-400 truncate">{{ selectedUrl?.url }}</p>
           </div>
 
-          <div class="grid grid-cols-2 gap-4">
+          <div class="flex gap-2 p-1 bg-slate-950 rounded-xl border border-slate-800">
+            <button @click="testMode = 'QUICK'" :class="['flex-1 py-1.5 rounded-lg text-xs font-bold transition-all', testMode === 'QUICK' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-slate-300']">Quick Test</button>
+            <button @click="testMode = 'SCRIPT'" :class="['flex-1 py-1.5 rounded-lg text-xs font-bold transition-all', testMode === 'SCRIPT' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-slate-300']">Custom Script</button>
+          </div>
+
+          <div v-if="testMode === 'QUICK'" class="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
             <div>
               <label class="block text-sm font-medium text-slate-400 mb-1 flex items-center gap-2">
                 <UsersIcon class="w-3.5 h-3.5" /> Virtual Users
@@ -146,13 +151,31 @@
               <input v-model="testConfig.duration" type="text" placeholder="30s" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 focus:ring-2 focus:ring-emerald-500 transition-all font-medium text-white" />
             </div>
           </div>
+
+          <div v-else class="animate-in fade-in slide-in-from-top-2 duration-300 space-y-3">
+            <div class="flex justify-between items-center">
+              <label class="block text-sm font-medium text-slate-400">Endpoint Script</label>
+              <button @click="saveScriptToUrl" :disabled="isSavingScript" class="text-xs font-bold text-indigo-400 hover:text-indigo-300 flex items-center gap-1">
+                <Loader2Icon v-if="isSavingScript" class="w-3 h-3 animate-spin" />
+                {{ isSavingScript ? 'Saving...' : 'Save as Default' }}
+              </button>
+            </div>
+            <div class="bg-slate-950 rounded-xl border border-slate-800 focus-within:ring-2 focus-within:ring-indigo-500 overflow-hidden">
+              <textarea 
+                v-model="customScriptContent" 
+                class="w-full h-64 bg-transparent p-4 font-mono text-xs text-indigo-300 outline-none resize-none"
+                placeholder="import http from 'k6/http'; ..."
+              ></textarea>
+            </div>
+            <p class="text-[10px] text-slate-500 italic">Adjust logic specifically for this endpoint. Changes will be used for this run.</p>
+          </div>
         </div>
 
         <div class="p-6 bg-slate-800/30 border-t border-slate-800 flex gap-3">
           <button @click="showTestModal = false" class="flex-1 px-4 py-2 bg-slate-800 rounded-xl font-medium hover:bg-slate-700 transition-colors">
             Cancel
           </button>
-          <button @click="runUrlTest" :disabled="isTesting" class="flex-2 px-6 py-2 bg-emerald-600 rounded-xl font-bold hover:bg-emerald-500 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20">
+          <button @click="runUrlTest" :disabled="isTesting || (testMode === 'SCRIPT' && !customScriptContent)" class="flex-2 px-6 py-2 bg-emerald-600 rounded-xl font-bold hover:bg-emerald-500 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20">
             <PlayIcon v-if="!isTesting" class="w-4 h-4" />
             <Loader2Icon v-else class="w-4 h-4 animate-spin" />
             {{ isTesting ? 'Launching...' : 'Ignite Storm' }}
@@ -170,7 +193,7 @@ import {
   PlusIcon, TrashIcon, CopyIcon, LinkIcon, 
   Loader2Icon, PlayIcon, ZapIcon, TimerIcon, UsersIcon 
 } from 'lucide-vue-next';
-import { getUrls, createUrl, deleteUrl as removeUrl, runDynamicTest } from '../services/api';
+import { getUrls, createUrl, updateUrl, deleteUrl as removeUrl, runDynamicTest, getScripts } from '../services/api';
 
 const emit = defineEmits(['test-started']);
 const filter = ref('ALL');
@@ -184,6 +207,12 @@ const categories = ['ALL', 'FRONTEND', 'BACKEND', 'API', 'STAGING', 'PRODUCTION'
 const urls = ref([]);
 const newUrl = ref({ name: '', url: '', category: 'API' });
 const selectedUrl = ref(null);
+const testMode = ref('QUICK'); // QUICK or SCRIPT
+const selectedScriptId = ref(null);
+const availableScripts = ref([]);
+const customScriptContent = ref('');
+const isSavingScript = ref(false);
+
 const testConfig = reactive({
   vus: 10,
   duration: '30s',
@@ -202,7 +231,19 @@ const fetchUrls = async () => {
   }
 };
 
-onMounted(fetchUrls);
+const fetchScripts = async () => {
+  try {
+    const res = await getScripts();
+    availableScripts.value = res.data || [];
+  } catch (err) {
+    console.error('Failed to fetch scripts:', err);
+  }
+};
+
+onMounted(() => {
+  fetchUrls();
+  fetchScripts();
+});
 
 const filteredUrls = computed(() => {
   if (filter.value === 'ALL') return urls.value;
@@ -247,17 +288,59 @@ const deleteUrl = async (id) => {
 
 const openTestModal = (url) => {
   selectedUrl.value = url;
+  testMode.value = 'QUICK';
+  selectedScriptId.value = null;
+  // Load custom script from URL if it exists, otherwise provide template
+  customScriptContent.value = url.script || `import http from 'k6/http';
+import { sleep } from 'k6';
+
+export const options = {
+  vus: 10,
+  duration: '30s',
+};
+
+export default function () {
+  http.get('${url.url}');
+  sleep(1);
+}`;
   showTestModal.value = true;
+};
+
+const saveScriptToUrl = async () => {
+  if (!selectedUrl.value || !customScriptContent.value) return;
+  isSavingScript.value = true;
+  try {
+    await updateUrl(selectedUrl.value.id, { 
+      ...selectedUrl.value, 
+      script: customScriptContent.value 
+    });
+    // Update local URL object
+    selectedUrl.value.script = customScriptContent.value;
+    alert('Script saved to endpoint default!');
+  } catch (err) {
+    alert('Failed to save script: ' + err.message);
+  } finally {
+    isSavingScript.value = false;
+  }
 };
 
 const runUrlTest = async () => {
   if (!selectedUrl.value) return;
   isTesting.value = true;
   try {
-    await runDynamicTest({
+    const payload = {
       url: selectedUrl.value.url,
-      ...testConfig
-    });
+      category: selectedUrl.value.category,
+      method: testConfig.method,
+      vus: testConfig.vus,
+      duration: testConfig.duration
+    };
+
+    if (testMode.value === 'SCRIPT') {
+      payload.script_content = customScriptContent.value;
+    }
+
+    await runDynamicTest(payload);
     showTestModal.value = false;
     emit('test-started');
   } catch (err) {
