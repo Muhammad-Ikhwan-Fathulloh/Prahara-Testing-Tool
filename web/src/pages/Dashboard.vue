@@ -170,6 +170,13 @@
                 <p class="text-2xl font-black text-white">{{ selectedRunMetrics?.requests || 0 }}</p>
               </div>
               <div class="bg-slate-800/50 p-4 rounded-2xl border border-slate-700">
+                <p class="text-[10px] uppercase font-bold text-slate-500 mb-1">Success / Failed</p>
+                <p class="text-2xl font-black text-white">
+                  <span class="text-emerald-400">{{ selectedRunMetrics?.success || 0 }}</span> / 
+                  <span class="text-rose-400">{{ selectedRunMetrics?.failed || 0 }}</span>
+                </p>
+              </div>
+              <div class="bg-slate-800/50 p-4 rounded-2xl border border-slate-700">
                 <p class="text-[10px] uppercase font-bold text-slate-500 mb-1">Configuration</p>
                 <p class="text-sm font-bold text-slate-300">{{ selectedRun?.vus }} VUs / {{ selectedRun?.duration }}</p>
               </div>

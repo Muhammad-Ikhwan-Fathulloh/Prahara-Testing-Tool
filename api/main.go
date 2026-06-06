@@ -30,12 +30,24 @@ func main() {
 	db.AutoMigrate(&models.User{}, &models.TestScript{}, &models.TestRun{}, &models.TestingURL{})
 
 	// Initialize K6 Service
-	k6Service := &services.K6Service{
-		DB:     db,
-		Bucket: "prahara-metrics",
-		Org:    "prahara-org",
-		Token:  "prahara-token-1234567890",
+	influxURL := os.Getenv("INFLUX_URL")
+	if influxURL == "" {
+		influxURL = "http://localhost:8086"
 	}
+	influxToken := os.Getenv("INFLUX_TOKEN")
+	if influxToken == "" {
+		influxToken = "prahara-token-1234567890"
+	}
+	influxOrg := os.Getenv("INFLUX_ORG")
+	if influxOrg == "" {
+		influxOrg = "prahara-org"
+	}
+	influxBucket := os.Getenv("INFLUX_BUCKET")
+	if influxBucket == "" {
+		influxBucket = "prahara-metrics"
+	}
+
+	k6Service := services.NewK6Service(db, influxURL, influxToken, influxOrg, influxBucket)
 
 	r := gin.Default()
 	r.Use(cors.Default())
@@ -300,5 +312,5 @@ func main() {
 		c.JSON(http.StatusOK, run)
 	})
 
-	r.Run(":8080")
+	r.Run(":3000")
 }

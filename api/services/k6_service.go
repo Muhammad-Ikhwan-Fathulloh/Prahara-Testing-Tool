@@ -148,7 +148,7 @@ func (s *K6Service) RunDynamicTest(db *gorm.DB, targetURL, method string, vus in
 	if scriptToRun == "" {
 		scriptTemplate := `
 import http from 'k6/http';
-import { sleep } from 'k6';
+import { sleep, check } from 'k6';
 
 export const options = {
   vus: %d,
@@ -156,7 +156,10 @@ export const options = {
 };
 
 export default function () {
-  http.%s('%s');
+  const res = http.%s('%s');
+  check(res, {
+    'status is 200': (r) => r.status === 200,
+  });
   sleep(1);
 }`
 		scriptToRun = fmt.Sprintf(scriptTemplate, vus, duration, strings.ToLower(method), targetURL)
@@ -199,7 +202,7 @@ func (s *K6Service) GetRunMetrics(ctx context.Context, runID uint) (map[string]i
 	query := fmt.Sprintf(`from(bucket: "%s") 
 		|> range(start: -24h) 
 		|> filter(fn: (r) => r["run_id"] == "%d")
-		|> filter(fn: (r) => r["_measurement"] == "http_req_duration" or r["_measurement"] == "http_reqs")
+		|> filter(fn: (r) => r["_measurement"] == "http_req_duration" or r["_measurement"] == "http_reqs" or r["_measurement"] == "checks")
 		|> filter(fn: (r) => r["_field"] == "value")`, s.Bucket, runID)
 
 	result, err := queryAPI.Query(ctx, query)
@@ -228,6 +231,12 @@ func (s *K6Service) GetRunMetrics(ctx context.Context, runID uint) (map[string]i
 			}
 		} else if meas == "http_reqs" {
 			summary["requests"] = summary["requests"].(int) + 1
+		} else if meas == "checks" {
+			if v, ok := val.(float64); ok && v == 1.0 {
+				summary["success"] = summary["success"].(int) + 1
+			} else {
+				summary["failed"] = summary["failed"].(int) + 1
+			}
 		}
 	}
 
